@@ -22,4 +22,5 @@ Then visit `http://localhost:8080`.
 
 ## GitHub Pages
 
-This repo is designed to publish from the `main` branch root.
+The source lives on `main`; GitHub Pages publishes the static app from the
+`gh-pages` branch root.
