@@ -1902,7 +1902,10 @@ function renderMasteryGrid() {
     const item = state.stats.scenarios[scenario.id];
     const cell = document.createElement("span");
     cell.className = "mastery-cell";
-    cell.title = `${scenario.label} vs ${scenario.dealerRank}: ${ACTIONS[scenario.answer].label}`;
+    const tooltip = `${scenario.label} vs dealer ${scenario.dealerRank} · ${ACTIONS[scenario.answer].label}`;
+    cell.dataset.tooltip = tooltip;
+    cell.setAttribute("aria-label", tooltip);
+    cell.tabIndex = 0;
     if (item?.attempts) {
       const rate = item.correct / item.attempts;
       cell.classList.add("is-started");

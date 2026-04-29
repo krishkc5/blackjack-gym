@@ -1319,10 +1319,65 @@ h2 {
 }
 
 .mastery-cell {
+  position: relative;
   aspect-ratio: 1;
   border: 1px solid rgba(32, 31, 27, 0.32);
   border-radius: 4px;
   background: #ded4c6;
+  cursor: help;
+}
+
+.mastery-cell::before,
+.mastery-cell::after {
+  position: absolute;
+  left: 50%;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.mastery-cell::before {
+  content: "";
+  bottom: calc(100% + 4px);
+  border: 5px solid transparent;
+  border-bottom: 0;
+  border-top-color: var(--ink);
+}
+
+.mastery-cell::after {
+  content: attr(data-tooltip);
+  bottom: calc(100% + 9px);
+  width: max-content;
+  max-width: 170px;
+  padding: 6px 8px;
+  border: 1px solid var(--ink);
+  border-radius: 6px;
+  background: #fffdf8;
+  box-shadow: 3px 3px 0 rgba(32, 31, 27, 0.22);
+  color: var(--ink);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  white-space: normal;
+}
+
+.mastery-cell:hover,
+.mastery-cell:focus-visible {
+  z-index: 20;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.mastery-cell:hover::before,
+.mastery-cell:hover::after,
+.mastery-cell:focus-visible::before,
+.mastery-cell:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .mastery-cell.is-started {
