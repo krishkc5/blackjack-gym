@@ -190,6 +190,55 @@
             </section>
 
             <aside class="control-panel" aria-label="Gym controls and session stats">
+              <section class="mode-panel" aria-labelledby="gym-mode-title">
+                <div class="panel-heading">
+                  <p class="eyebrow">Gym mode</p>
+                  <h2 id="gym-mode-title">Format</h2>
+                </div>
+                <div class="mode-toggle" role="group" aria-label="Gym mode">
+                  <button class="mode-btn is-active" type="button" data-gym-mode="drill">Drill</button>
+                  <button class="mode-btn" type="button" data-gym-mode="sim">Simulation</button>
+                </div>
+                <p class="mode-copy" id="gym-mode-copy">
+                  One decision at a time with immediate strategy feedback.
+                </p>
+                <div class="chip-bank" aria-label="Chip stack">
+                  <span class="metric-label">Bankroll</span>
+                  <strong id="bankroll-amount">$1,000</strong>
+                  <div class="chip-stack" aria-hidden="true">
+                    <span class="chip chip-red"></span>
+                    <span class="chip chip-gold"></span>
+                    <span class="chip chip-teal"></span>
+                  </div>
+                  <p class="bankroll-note" id="sim-ledger">0 rounds · +$0 net</p>
+                </div>
+                <div class="sim-settings">
+                  <label>
+                    <span>Seats</span>
+                    <select id="sim-seats">
+                      <option value="1">1 seat</option>
+                      <option value="2">2 seats</option>
+                      <option value="3" selected>3 seats</option>
+                      <option value="4">4 seats</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Bet / seat</span>
+                    <select id="sim-bet">
+                      <option value="auto" selected>Auto-min ($5)</option>
+                      <option value="5">$5</option>
+                      <option value="10">$10</option>
+                      <option value="25">$25</option>
+                      <option value="50">$50</option>
+                      <option value="100">$100</option>
+                    </select>
+                  </label>
+                  <button class="spot-load" type="button" id="reset-bankroll">Reset stack</button>
+                </div>
+                <p class="shoe-count" id="shoe-count">8-deck shoe · 416 cards</p>
+                <button class="spot-load sim-deal" type="button" id="sim-deal">Deal simulation round</button>
+              </section>
+
               <section class="focus-panel" aria-labelledby="focus-title">
                 <div class="panel-heading">
                   <p class="eyebrow">Mode</p>

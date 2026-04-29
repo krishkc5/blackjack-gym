@@ -127,6 +127,7 @@ select {
 .deck-btn,
 .focus-btn,
 .flashcard-btn,
+.mode-btn,
 .reset-btn,
 .next-btn,
 .action-btn {
@@ -599,6 +600,28 @@ h2 {
   transform: rotate(180deg);
 }
 
+.playing-card.is-hidden {
+  display: grid;
+  place-items: center;
+  grid-template-rows: 1fr;
+  background:
+    radial-gradient(circle at center, rgba(255, 250, 240, 0.22) 0 18%, transparent 19%),
+    repeating-linear-gradient(45deg, #174d65 0 8px, #11394c 8px 16px);
+  color: var(--paper);
+}
+
+.card-back-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 2px solid rgba(255, 250, 240, 0.78);
+  border-radius: 50%;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
 .versus-mark {
   position: relative;
   z-index: 1;
@@ -622,6 +645,167 @@ h2 {
   background: rgba(255, 248, 233, 0.24);
 }
 
+.felt-surface.is-sim-table {
+  grid-template-rows: auto 24px minmax(0, 1fr);
+  min-height: 540px;
+  padding: 28px 22px;
+}
+
+.felt-surface.is-sim-table::before {
+  inset: 18px;
+  border-radius: 28px;
+}
+
+.felt-surface.is-sim-table .dealer-row,
+.felt-surface.is-sim-table .player-row {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.felt-surface.is-sim-table .dealer-row {
+  align-self: start;
+}
+
+.felt-surface.is-sim-table .player-row {
+  align-self: stretch;
+}
+
+.felt-surface.is-sim-table .area-label {
+  justify-self: center;
+  padding: 5px 11px;
+  border: 1px solid rgba(255, 248, 233, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 56, 47, 0.62);
+}
+
+.felt-surface.is-sim-table .card-stack {
+  grid-column: 1;
+}
+
+.felt-surface.is-sim-table .dealer-row .card-stack {
+  min-height: 124px;
+}
+
+.felt-surface.is-sim-table .versus-mark {
+  width: min(220px, 48%);
+  align-self: center;
+}
+
+.card-stack.is-sim-layout {
+  display: grid;
+  width: 100%;
+  max-width: 980px;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  justify-self: center;
+  min-height: 0;
+}
+
+.seat-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 172px;
+  padding: 12px;
+  border: 1px solid rgba(255, 248, 233, 0.72);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.9);
+  box-shadow: 5px 5px 0 rgba(0, 0, 0, 0.18);
+  color: var(--ink);
+}
+
+.seat-card.is-active {
+  outline: 3px solid rgba(240, 205, 82, 0.68);
+  transform: translateY(-2px);
+}
+
+.seat-card.is-done {
+  opacity: 0.82;
+}
+
+.empty-seat {
+  width: min(100%, 380px);
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+.seat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.seat-head strong {
+  padding: 4px 7px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: #efe2c6;
+  white-space: nowrap;
+}
+
+.seat-hands {
+  display: grid;
+  gap: 8px;
+}
+
+.sim-hand {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid rgba(32, 31, 27, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.54);
+}
+
+.sim-hand.is-active {
+  border-color: var(--ink);
+  background: #fffdf8;
+}
+
+.sim-hand span,
+.seat-result {
+  margin: 0;
+  color: #464037;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.mini-card-row {
+  display: flex;
+  min-height: 64px;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.sim-hand .playing-card {
+  width: 44px;
+  height: 62px;
+  padding: 5px;
+  border-width: 1px;
+  border-radius: 6px;
+  box-shadow: 2px 2px 0 rgba(32, 31, 27, 0.18);
+}
+
+.sim-hand .playing-card .rank {
+  font-size: 0.74rem;
+}
+
+.sim-hand .playing-card .suit {
+  font-size: 1rem;
+}
+
+.sim-hand .playing-card .corner {
+  display: none;
+}
+
 .action-bar {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -642,6 +826,7 @@ h2 {
 .focus-btn:hover,
 .flashcard-btn:hover,
 .lesson-card:hover,
+.mode-btn:hover,
 .hint-btn:hover,
 .spot-load:hover,
 .next-btn:hover,
@@ -654,6 +839,7 @@ h2 {
 .focus-btn:active,
 .flashcard-btn:active,
 .lesson-card:active,
+.mode-btn:active,
 .hint-btn:active,
 .spot-load:active,
 .next-btn:active,
@@ -758,6 +944,7 @@ h2 {
   overflow: hidden;
 }
 
+.mode-panel,
 .focus-panel,
 .spot-panel,
 .stat-panel,
@@ -765,10 +952,170 @@ h2 {
   padding: 18px;
 }
 
+.mode-panel,
 .focus-panel,
 .spot-panel,
 .stat-panel {
   border-bottom: 2px solid var(--ink);
+}
+
+.mode-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 16px;
+  padding: 4px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: #eadfcd;
+}
+
+.mode-btn {
+  min-height: 40px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.mode-btn.is-active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.mode-copy {
+  margin: 14px 0 0;
+  color: #464037;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.42;
+}
+
+.chip-bank {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.chip-bank strong {
+  display: block;
+  grid-column: 1;
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.chip-stack {
+  display: flex;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  padding-left: 8px;
+}
+
+.chip {
+  width: 34px;
+  height: 34px;
+  margin-left: -8px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  box-shadow: 2px 3px 0 rgba(32, 31, 27, 0.2);
+}
+
+.chip-red {
+  background:
+    radial-gradient(circle at center, #fffdf8 0 22%, transparent 24%),
+    conic-gradient(#b94b48 0 14%, #fffdf8 14% 20%, #b94b48 20% 34%, #fffdf8 34% 40%, #b94b48 40% 54%, #fffdf8 54% 60%, #b94b48 60% 74%, #fffdf8 74% 80%, #b94b48 80%);
+}
+
+.chip-gold {
+  background:
+    radial-gradient(circle at center, #fffdf8 0 22%, transparent 24%),
+    conic-gradient(#c7962b 0 14%, #fffdf8 14% 20%, #c7962b 20% 34%, #fffdf8 34% 40%, #c7962b 40% 54%, #fffdf8 54% 60%, #c7962b 60% 74%, #fffdf8 74% 80%, #c7962b 80%);
+}
+
+.chip-teal {
+  background:
+    radial-gradient(circle at center, #fffdf8 0 22%, transparent 24%),
+    conic-gradient(#2e9285 0 14%, #fffdf8 14% 20%, #2e9285 20% 34%, #fffdf8 34% 40%, #2e9285 40% 54%, #fffdf8 54% 60%, #2e9285 60% 74%, #fffdf8 74% 80%, #2e9285 80%);
+}
+
+.bankroll-note {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sim-settings,
+.shoe-count,
+.sim-deal {
+  display: none;
+}
+
+.sim-settings {
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.sim-settings label {
+  display: grid;
+  gap: 6px;
+}
+
+.sim-settings label span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sim-settings .spot-load {
+  grid-column: 1 / -1;
+}
+
+.shoe-count {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sim-deal {
+  width: 100%;
+  margin-top: 12px;
+  background: var(--ink);
+  color: var(--paper);
+}
+
+#gym.is-sim .sim-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#gym.is-sim .shoe-count,
+#gym.is-sim .sim-deal {
+  display: block;
+}
+
+#gym.is-sim .focus-panel,
+#gym.is-sim .spot-panel {
+  display: none;
 }
 
 .focus-grid {
@@ -1109,6 +1456,7 @@ h2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .mode-panel,
   .focus-panel {
     border-right: 2px solid var(--ink);
     border-bottom: 2px solid var(--ink);
@@ -1204,11 +1552,21 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .mode-panel,
   .focus-panel,
   .spot-panel,
   .stat-panel {
     border-right: 0;
     border-bottom: 2px solid var(--ink);
+  }
+
+  .felt-surface.is-sim-table {
+    min-height: 520px;
+    padding: 24px 14px;
+  }
+
+  .card-stack.is-sim-layout {
+    grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
   }
 
   .progress-layout {
@@ -1269,5 +1627,18 @@ h2 {
   .focus-grid,
   .stat-grid {
     grid-template-columns: 1fr;
+  }
+
+  #gym.is-sim .sim-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .seat-card {
+    min-height: 152px;
+  }
+
+  .sim-hand .playing-card {
+    width: 40px;
+    height: 58px;
   }
 }

@@ -1,6 +1,14 @@
 # Blackjack Gym
 
-A static GitHub Pages trainer for blackjack basic strategy reps. The app has a guided Learn mode for reasoning through patterns, flashcards for memorizing the strategy rules, a Gym mode for drills and exact spot simulation, and progress tracking in browser `localStorage`.
+A static GitHub Pages trainer for blackjack basic strategy reps. The app has a guided Learn mode for reasoning through patterns, flashcards for memorizing the strategy rules, a Gym mode for drills and table simulation, and progress tracking in browser `localStorage`.
+
+Gym simulation includes:
+
+- 1-4 player seats for practicing several decisions in one round
+- A persistent chip stack that starts at `$1,000`
+- Auto-min bet mode using a `$5` table minimum
+- A pre-shuffled 8-deck shoe before cards are dealt, with shoe depletion tracked between rounds
+- Basic-strategy feedback while playing full rounds with hits, stands, doubles, splits, and surrender
 
 Rules encoded in the trainer:
 

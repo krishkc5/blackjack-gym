@@ -14,8 +14,13 @@ const CATEGORY_LABELS = {
   soft: "Soft totals",
   pair: "Pairs",
 };
+const TABLE_MIN_BET = 5;
+const SHOE_DECKS = 8;
+const SHOE_CARD_COUNT = SHOE_DECKS * 52;
+const SHOE_RESHUFFLE_THRESHOLD = 60;
 
 const state = {
+  gymMode: "drill",
   focus: "all",
   current: null,
   locked: false,
@@ -25,6 +30,16 @@ const state = {
   flashcardDeck: "all",
   flashcardIndex: 0,
   flashcardFlipped: false,
+  sim: {
+    dealer: [],
+    seats: [],
+    currentSeat: 0,
+    currentHand: 0,
+    roundActive: false,
+    roundOver: true,
+    revealDealer: false,
+    roundNet: 0,
+  },
   stats: loadStats(),
 };
 
@@ -39,6 +54,16 @@ const els = {
   feedbackTitle: document.querySelector("#feedback-title"),
   feedbackCopy: document.querySelector("#feedback-copy"),
   nextButton: document.querySelector("#next-btn"),
+  gymView: document.querySelector("#gym"),
+  gymModeButtons: document.querySelectorAll("[data-gym-mode]"),
+  gymModeCopy: document.querySelector("#gym-mode-copy"),
+  simDeal: document.querySelector("#sim-deal"),
+  simSeats: document.querySelector("#sim-seats"),
+  simBet: document.querySelector("#sim-bet"),
+  bankrollAmount: document.querySelector("#bankroll-amount"),
+  simLedger: document.querySelector("#sim-ledger"),
+  shoeCount: document.querySelector("#shoe-count"),
+  resetBankroll: document.querySelector("#reset-bankroll"),
   lessonList: document.querySelector("#lesson-list"),
   lessonKicker: document.querySelector("#lesson-kicker"),
   lessonTitle: document.querySelector("#lesson-title"),
@@ -98,9 +123,10 @@ function init() {
   renderFlashcard();
   populateSpotControls();
   wireEvents();
+  prepareShoeForRound();
   syncStats();
+  setGymMode(state.gymMode);
   startLearnLesson(state.learnLesson);
-  nextHand();
 }
 
 function wireEvents() {
@@ -118,23 +144,30 @@ function wireEvents() {
     button.addEventListener("click", () => setFlashcardDeck(button.dataset.flashcardDeck));
   });
 
+  els.gymModeButtons.forEach((button) => {
+    button.addEventListener("click", () => setGymMode(button.dataset.gymMode));
+  });
+
   els.focusButtons.forEach((button) => {
     button.addEventListener("click", () => {
       state.focus = button.dataset.focus;
       els.focusButtons.forEach((item) => item.classList.toggle("is-active", item === button));
-      nextHand();
+      if (state.gymMode === "drill") nextHand();
     });
   });
 
   els.actionButtons.forEach((button) => {
-    button.addEventListener("click", () => submitAnswer(button.dataset.action));
+    button.addEventListener("click", () => {
+      if (state.gymMode === "sim") submitSimAction(button.dataset.action);
+      else submitAnswer(button.dataset.action);
+    });
   });
 
   els.learnActionButtons.forEach((button) => {
     button.addEventListener("click", () => submitLearnAnswer(button.dataset.learnAction));
   });
 
-  els.nextButton.addEventListener("click", nextHand);
+  els.nextButton.addEventListener("click", handleNextButton);
   els.learnNextButton.addEventListener("click", nextLearnSpot);
   els.hintButton.addEventListener("click", toggleHint);
   els.flashcardCard.addEventListener("click", flipFlashcard);
@@ -148,6 +181,15 @@ function wireEvents() {
   els.flashcardKnown.addEventListener("click", () => markFlashcard("known"));
   els.flashcardMissed.addEventListener("click", () => markFlashcard("missed"));
   els.flashcardNext.addEventListener("click", nextFlashcard);
+  els.simDeal.addEventListener("click", dealSimRound);
+  els.simSeats.addEventListener("change", () => {
+    if (state.gymMode === "sim" && state.sim.roundOver) renderSimRound("Seat count updated.");
+  });
+  els.simBet.addEventListener("change", () => {
+    renderBankroll();
+    if (state.gymMode === "sim" && state.sim.roundOver) renderSimRound("Bet size updated.");
+  });
+  els.resetBankroll.addEventListener("click", resetBankroll);
   els.spotCategory.addEventListener("change", populateSpotPlayers);
   els.spotLoad.addEventListener("click", loadSelectedSpot);
   els.resetStats.addEventListener("click", resetStats);
@@ -171,7 +213,7 @@ function wireEvents() {
     const activeView = document.querySelector(".view.is-active")?.dataset.view;
     if (action === "NEXT") {
       if (activeView === "learn" && state.learnLocked) nextLearnSpot();
-      if (activeView === "gym" && state.locked) nextHand();
+      if (activeView === "gym") handleNextButton();
       return;
     }
 
@@ -179,7 +221,10 @@ function wireEvents() {
       submitLearnAnswer(action);
       return;
     }
-    if (activeView === "gym") submitAnswer(action);
+    if (activeView === "gym") {
+      if (state.gymMode === "sim") submitSimAction(action);
+      else submitAnswer(action);
+    }
   });
 }
 
@@ -189,6 +234,39 @@ function setView(viewName) {
     button.classList.toggle("is-active", button.dataset.viewButton === viewName);
   });
   if (viewName === "progress") syncStats();
+}
+
+function setGymMode(mode) {
+  state.gymMode = mode;
+  els.gymView.classList.toggle("is-sim", mode === "sim");
+  els.gymModeButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.gymMode === mode);
+  });
+
+  if (mode === "sim") {
+    els.gymModeCopy.textContent = "Play multiple seats through full rounds while the bankroll tracks wins, losses, doubles, splits, and surrender.";
+    prepareShoeForRound();
+    if (!state.sim.roundActive && !state.sim.roundOver) resetSimTable();
+    if (!state.sim.seats.length) {
+      resetSimTable();
+      renderSimRound("Deal a simulation round.");
+    } else {
+      renderSimRound();
+    }
+    return;
+  }
+
+  els.gymModeCopy.textContent = "One decision at a time with immediate strategy feedback.";
+  nextHand();
+}
+
+function handleNextButton() {
+  if (state.gymMode === "sim") {
+    if (state.sim.roundOver) dealSimRound();
+    return;
+  }
+
+  if (state.locked) nextHand();
 }
 
 function nextHand() {
@@ -240,8 +318,612 @@ function submitAnswer(action) {
 
 function renderHand(scenario) {
   els.handTag.textContent = scenario.label;
+  els.dealerCards.classList.remove("is-sim-layout");
+  els.playerCards.classList.remove("is-sim-layout");
+  els.dealerCards.closest(".felt-surface")?.classList.remove("is-sim-table");
   els.dealerCards.replaceChildren(createCard(scenario.dealer));
   els.playerCards.replaceChildren(...scenario.player.map(createCard));
+}
+
+function resetSimTable() {
+  state.sim = {
+    dealer: [],
+    seats: [],
+    currentSeat: 0,
+    currentHand: 0,
+    roundActive: false,
+    roundOver: true,
+    revealDealer: false,
+    roundNet: 0,
+  };
+}
+
+function dealSimRound() {
+  const seats = Number(els.simSeats.value);
+  const bet = resolveSimBet();
+  const totalAtRisk = seats * bet;
+
+  if (state.sim.roundActive && !state.sim.roundOver) {
+    renderSimRound("Finish this round before dealing the next one.");
+    return;
+  }
+
+  prepareShoeForRound();
+
+  if (state.stats.sim.bankroll < totalAtRisk) {
+    renderSimRound(`Need ${formatMoney(totalAtRisk)} for ${seats} seats at ${formatMoney(bet)} each.`);
+    return;
+  }
+
+  state.sim = {
+    dealer: [drawCard(), drawCard()],
+    seats: Array.from({ length: seats }, (_, index) => ({
+      id: index + 1,
+      hands: [newSimHand([drawCard(), drawCard()], bet)],
+    })),
+    currentSeat: 0,
+    currentHand: 0,
+    roundActive: true,
+    roundOver: false,
+    revealDealer: false,
+    roundNet: 0,
+  };
+
+  resolveInitialBlackjacks();
+  advanceSimTurn();
+  renderSimRound("Round dealt.");
+}
+
+function newSimHand(cards, bet, fromSplit = false) {
+  return {
+    id: randomId(),
+    cards,
+    bet,
+    fromSplit,
+    doubled: false,
+    status: "playing",
+    result: "",
+    payout: 0,
+  };
+}
+
+function renderSimRound(message = "") {
+  els.dealerCards.closest(".felt-surface")?.classList.add("is-sim-table");
+  els.dealerCards.classList.remove("is-sim-layout");
+  els.playerCards.classList.add("is-sim-layout");
+
+  const dealerCards = state.sim.dealer.length
+    ? state.sim.dealer.map((card, index) => (index === 1 && !state.sim.revealDealer ? { hidden: true } : card))
+    : [{ rank: "A", suit: "♣" }, { hidden: true }];
+  els.dealerCards.replaceChildren(...dealerCards.map(createCard));
+
+  if (!state.sim.seats.length) {
+    els.handTag.textContent = "Simulation";
+    els.playerCards.replaceChildren(emptySimSeat());
+    setSimFeedback(message || "Choose Simulation, then deal a round.", "Multiple seats, one bankroll.");
+    updateSimButtons(null);
+    renderBankroll();
+    return;
+  }
+
+  els.playerCards.replaceChildren(...state.sim.seats.map((seat, index) => renderSimSeat(seat, index)));
+  const active = activeSimHand();
+  els.handTag.textContent = active
+    ? `Seat ${active.seat.id} · ${handLabel(active.hand.cards)}`
+    : `Round ${state.sim.roundOver ? "complete" : "in progress"}`;
+
+  if (state.sim.roundOver) {
+    const direction = state.sim.roundNet >= 0 ? "+" : "";
+    setSimFeedback("Round complete.", `${direction}${formatMoney(state.sim.roundNet)} this round. Bankroll ${formatMoney(state.stats.sim.bankroll)}.`);
+  } else if (active) {
+    const scenario = liveScenarioForHand(active.hand, dealerUpcardRank());
+    setSimFeedback(
+      message || `Seat ${active.seat.id}: choose an action.`,
+      `Basic strategy is checking ${scenario.label} against dealer ${dealerUpcardRank()}.`
+    );
+  } else {
+    setSimFeedback(message || "Dealer is resolving the table.", "");
+  }
+
+  updateSimButtons(active?.hand ?? null);
+  renderBankroll();
+}
+
+function renderSimSeat(seat, seatIndex) {
+  const node = document.createElement("article");
+  node.className = "seat-card";
+  if (seatIndex === state.sim.currentSeat && !state.sim.roundOver) node.classList.add("is-active");
+  if (seat.hands.every((hand) => hand.status !== "playing")) node.classList.add("is-done");
+
+  const hands = seat.hands.map((hand, handIndex) => renderSimHand(hand, seatIndex, handIndex));
+  const net = seat.hands.reduce((sum, hand) => sum + (hand.payout ?? 0), 0);
+  const netText = net ? ` · ${net > 0 ? "+" : ""}${formatMoney(net)}` : "";
+  node.innerHTML = `
+    <div class="seat-head">
+      <span>Seat ${seat.id}</span>
+      <strong>${formatMoney(seat.hands.reduce((sum, hand) => sum + hand.bet, 0))}</strong>
+    </div>
+    <div class="seat-hands"></div>
+    <p class="seat-result">${seatSummary(seat)}${netText}</p>
+  `;
+  node.querySelector(".seat-hands").replaceChildren(...hands);
+  return node;
+}
+
+function renderSimHand(hand, seatIndex, handIndex) {
+  const node = document.createElement("div");
+  node.className = "sim-hand";
+  if (seatIndex === state.sim.currentSeat && handIndex === state.sim.currentHand && hand.status === "playing") {
+    node.classList.add("is-active");
+  }
+  node.innerHTML = `
+    <div class="mini-card-row"></div>
+    <span>${handLabel(hand.cards)}${hand.doubled ? " · double" : ""}</span>
+  `;
+  node.querySelector(".mini-card-row").replaceChildren(...hand.cards.map(createCard));
+  return node;
+}
+
+function emptySimSeat() {
+  const node = document.createElement("article");
+  node.className = "seat-card empty-seat";
+  node.innerHTML = `
+    <div class="seat-head">
+      <span>Simulation table</span>
+      <strong>${formatMoney(resolveSimBet())}</strong>
+    </div>
+    <p class="seat-result">Choose seats, set your bet, and deal.</p>
+  `;
+  return node;
+}
+
+function submitSimAction(action) {
+  const active = activeSimHand();
+  if (!active || state.sim.roundOver) return;
+
+  const { hand, seat } = active;
+  if (!legalSimActions(hand).includes(action)) {
+    renderSimRound("That action is not available for this hand.");
+    return;
+  }
+
+  const scenario = liveScenarioForHand(hand, dealerUpcardRank());
+  const correct = action === scenario.answer;
+  recordAttempt(scenario, correct);
+
+  const expected = ACTIONS[scenario.answer].label;
+  const chosen = ACTIONS[action].label;
+  let detail = correct ? `Correct: ${expected}.` : `${expected}, not ${chosen}.`;
+
+  if (action === "H") {
+    hand.cards.push(drawCard());
+    if (bestTotal(hand.cards).value > 21) {
+      hand.status = "bust";
+      hand.result = "Bust";
+      detail += " The hand busted.";
+    }
+  }
+
+  if (action === "S") {
+    hand.status = "stood";
+    hand.result = "Stood";
+  }
+
+  if (action === "D") {
+    hand.bet *= 2;
+    hand.doubled = true;
+    hand.cards.push(drawCard());
+    hand.status = bestTotal(hand.cards).value > 21 ? "bust" : "stood";
+    hand.result = hand.status === "bust" ? "Double bust" : "Doubled";
+  }
+
+  if (action === "R") {
+    hand.status = "surrender";
+    hand.result = "Surrender";
+    hand.payout = -hand.bet / 2;
+  }
+
+  if (action === "P") {
+    if (canSplit(hand)) {
+      const splitCards = hand.cards;
+      const first = newSimHand([splitCards[0], drawCard()], hand.bet, true);
+      const second = newSimHand([splitCards[1], drawCard()], hand.bet, true);
+      const index = seat.hands.indexOf(hand);
+      seat.hands.splice(index, 1, first, second);
+      state.sim.currentHand = index;
+      if (splitCards[0].rank === "A") {
+        first.status = "stood";
+        first.result = "Split ace";
+        second.status = "stood";
+        second.result = "Split ace";
+      }
+      detail += " Split into two hands.";
+    } else {
+      detail += " Split is not legal here.";
+    }
+  }
+
+  els.feedbackZone.classList.toggle("is-correct", correct);
+  els.feedbackZone.classList.toggle("is-wrong", !correct);
+  els.feedbackTitle.textContent = detail;
+  els.feedbackCopy.textContent = scenario.reason;
+
+  if (action !== "H" || hand.status !== "playing") {
+    advanceSimTurn();
+    if (!state.sim.roundOver) renderSimRound(detail);
+  } else {
+    renderSimRound(detail);
+  }
+
+  syncStats();
+}
+
+function activeSimHand() {
+  const seat = state.sim.seats[state.sim.currentSeat];
+  if (!seat) return null;
+  const hand = seat.hands[state.sim.currentHand];
+  if (!hand || hand.status !== "playing") return null;
+  return { seat, hand };
+}
+
+function advanceSimTurn() {
+  for (let seatIndex = state.sim.currentSeat; seatIndex < state.sim.seats.length; seatIndex += 1) {
+    const seat = state.sim.seats[seatIndex];
+    const startHand = seatIndex === state.sim.currentSeat ? state.sim.currentHand : 0;
+    for (let handIndex = startHand; handIndex < seat.hands.length; handIndex += 1) {
+      if (seat.hands[handIndex].status === "playing") {
+        state.sim.currentSeat = seatIndex;
+        state.sim.currentHand = handIndex;
+        return;
+      }
+    }
+  }
+
+  finishSimRound();
+}
+
+function resolveInitialBlackjacks() {
+  const dealerBlackjack = isBlackjack(state.sim.dealer);
+  if (dealerBlackjack) state.sim.revealDealer = true;
+
+  state.sim.seats.forEach((seat) => {
+    seat.hands.forEach((hand) => {
+      if (isBlackjack(hand.cards)) {
+        hand.status = "blackjack";
+        hand.result = "Blackjack";
+      } else if (dealerBlackjack) {
+        hand.status = "stood";
+        hand.result = "Dealer blackjack";
+      }
+    });
+  });
+
+  if (dealerBlackjack || state.sim.seats.every((seat) => seat.hands.every((hand) => hand.status !== "playing"))) {
+    finishSimRound();
+  }
+}
+
+function finishSimRound() {
+  if (state.sim.roundOver) return;
+
+  state.sim.revealDealer = true;
+  const hasLiveHands = state.sim.seats.some((seat) => (
+    seat.hands.some((hand) => !["blackjack", "bust", "surrender"].includes(hand.status))
+  ));
+
+  if (hasLiveHands && !isBlackjack(state.sim.dealer)) {
+    while (dealerShouldHit(state.sim.dealer)) {
+      state.sim.dealer.push(drawCard());
+    }
+  }
+
+  const dealerTotal = bestTotal(state.sim.dealer);
+  const dealerBlackjack = isBlackjack(state.sim.dealer);
+  let roundNet = 0;
+  const summary = { wins: 0, losses: 0, pushes: 0 };
+
+  state.sim.seats.forEach((seat) => {
+    seat.hands.forEach((hand) => {
+      if (hand.status === "surrender") {
+        roundNet += hand.payout;
+        summary.losses += 1;
+        return;
+      }
+
+      const playerTotal = bestTotal(hand.cards);
+      if (hand.status === "bust" || playerTotal.value > 21) {
+        hand.status = "done";
+        hand.result = "Lost";
+        hand.payout = -hand.bet;
+        summary.losses += 1;
+      } else if (isBlackjack(hand.cards) && !hand.fromSplit && !dealerBlackjack) {
+        hand.status = "done";
+        hand.result = "Blackjack paid";
+        hand.payout = hand.bet * 1.5;
+        summary.wins += 1;
+      } else if (dealerBlackjack && !(isBlackjack(hand.cards) && !hand.fromSplit)) {
+        hand.status = "done";
+        hand.result = "Lost";
+        hand.payout = -hand.bet;
+        summary.losses += 1;
+      } else if (dealerTotal.value > 21 || playerTotal.value > dealerTotal.value) {
+        hand.status = "done";
+        hand.result = "Won";
+        hand.payout = hand.bet;
+        summary.wins += 1;
+      } else if (playerTotal.value < dealerTotal.value) {
+        hand.status = "done";
+        hand.result = "Lost";
+        hand.payout = -hand.bet;
+        summary.losses += 1;
+      } else {
+        hand.status = "done";
+        hand.result = "Push";
+        hand.payout = 0;
+        summary.pushes += 1;
+      }
+      roundNet += hand.payout;
+    });
+  });
+
+  state.sim.roundNet = roundNet;
+  state.sim.roundActive = false;
+  state.sim.roundOver = true;
+  state.stats.sim.bankroll += roundNet;
+  state.stats.sim.rounds += 1;
+  state.stats.sim.net += roundNet;
+  state.stats.sim.wins += summary.wins;
+  state.stats.sim.losses += summary.losses;
+  state.stats.sim.pushes += summary.pushes;
+  saveStats();
+  renderSimRound();
+}
+
+function updateSimButtons(hand) {
+  els.nextButton.textContent = state.gymMode === "sim" ? "Deal next round" : "Next hand";
+  els.nextButton.disabled = state.gymMode === "sim" ? !state.sim.roundOver : !state.locked;
+  els.simDeal.disabled = state.gymMode === "sim" && state.sim.roundActive && !state.sim.roundOver;
+
+  els.actionButtons.forEach((button) => {
+    const action = button.dataset.action;
+    const legal = hand ? legalSimActions(hand).includes(action) : false;
+    button.disabled = state.gymMode === "sim" ? !legal : false;
+    button.classList.remove("is-correct-choice", "is-wrong-choice");
+  });
+}
+
+function renderBankroll() {
+  const sim = ensureSimStats();
+  const shoeCount = Array.isArray(sim.shoe) ? sim.shoe.length : 0;
+  els.bankrollAmount.textContent = formatMoney(sim.bankroll);
+  els.shoeCount.textContent = `8-deck shoe · ${shoeCount}/${SHOE_CARD_COUNT} cards left`;
+  if (els.simLedger) {
+    const netSign = sim.net >= 0 ? "+" : "";
+    els.simLedger.textContent = `${sim.rounds} rounds · ${netSign}${formatMoney(sim.net)} net`;
+  }
+}
+
+function resolveSimBet() {
+  return els.simBet.value === "auto" ? TABLE_MIN_BET : Number(els.simBet.value);
+}
+
+function prepareShoeForRound() {
+  const sim = ensureSimStats();
+  if (!Array.isArray(sim.shoe) || sim.shoe.length < SHOE_RESHUFFLE_THRESHOLD) {
+    sim.shoe = shuffledShoe();
+    sim.reshuffles += 1;
+    sim.shoeId = randomId();
+    saveStats();
+  }
+}
+
+function shuffledShoe() {
+  const ranks = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+  const cards = [];
+  for (let deck = 0; deck < SHOE_DECKS; deck += 1) {
+    ranks.forEach((rank) => {
+      SUITS.forEach((suit) => cards.push({ rank, suit }));
+    });
+  }
+
+  for (let index = cards.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [cards[index], cards[swap]] = [cards[swap], cards[index]];
+  }
+  return cards;
+}
+
+function totalSimExposure() {
+  return state.sim.seats.reduce((sum, seat) => (
+    sum + seat.hands.reduce((seatSum, hand) => seatSum + hand.bet, 0)
+  ), 0);
+}
+
+function hasChipsFor(amount) {
+  return state.stats.sim.bankroll >= totalSimExposure() + amount;
+}
+
+function setSimFeedback(title, copy) {
+  els.feedbackZone.classList.remove("is-correct", "is-wrong");
+  els.feedbackTitle.textContent = title;
+  els.feedbackCopy.textContent = copy;
+}
+
+function liveScenarioForHand(hand, dealerRank) {
+  const canDoubleNow = canDouble(hand);
+  const canSplitNow = canSplit(hand);
+  const canSurrenderNow = canSurrender(hand);
+  const pairRank = pairRankFor(hand.cards);
+  const total = bestTotal(hand.cards);
+  let category = "hard";
+  let label = `Hard ${total.value}`;
+  let answer;
+  let reason;
+
+  if (pairRank) {
+    category = "pair";
+    label = `${pairRank === "10" ? "T" : pairRank},${pairRank === "10" ? "T" : pairRank}`;
+    answer = pairStrategy(pairRank, dealerRank);
+    reason = pairReason(pairRank, dealerRank, answer);
+  } else if (total.soft && total.value >= 13 && total.value <= 20) {
+    category = "soft";
+    const side = total.value - 11;
+    label = `A,${side}`;
+    answer = softStrategy(side, dealerRank);
+    reason = softReason(side, dealerRank, answer);
+  } else {
+    answer = hardAction(total.value, dealerRank, canSurrenderNow);
+    reason = hardReason(Math.min(Math.max(total.value, 5), 19), dealerRank, answer);
+  }
+
+  const preferredAnswer = answer;
+  answer = applyLegalFallback(answer, total, canDoubleNow, canSurrenderNow, canSplitNow);
+  if (answer !== preferredAnswer) {
+    reason = `${reason} Since that action is not available now, use the best legal fallback: ${ACTIONS[answer].label}.`;
+  }
+
+  return {
+    id: `sim:${category}:${label}:vs:${dealerRank}`,
+    category,
+    label,
+    player: hand.cards,
+    dealer: { rank: dealerRank, suit: "♣" },
+    dealerRank,
+    answer,
+    reason,
+  };
+}
+
+function hardAction(total, dealerRank, canSurrenderNow) {
+  if (total <= 8) return "H";
+  if (total >= 17) return "S";
+  const action = hardStrategy(total, dealerRank);
+  return action === "R" && !canSurrenderNow ? "H" : action;
+}
+
+function applyLegalFallback(action, total, canDoubleNow, canSurrenderNow, canSplitNow) {
+  if (action === "D" && !canDoubleNow) {
+    if (total.soft && total.value >= 18) return "S";
+    return "H";
+  }
+  if (action === "R" && !canSurrenderNow) return "H";
+  if (action === "P" && !canSplitNow) return total.value >= 17 ? "S" : "H";
+  return action;
+}
+
+function legalSimActions(hand) {
+  const actions = ["H", "S"];
+  if (canDouble(hand)) actions.push("D");
+  if (canSplit(hand)) actions.push("P");
+  if (canSurrender(hand)) actions.push("R");
+  return actions;
+}
+
+function canDouble(hand) {
+  return hand.status === "playing" && hand.cards.length === 2 && hasChipsFor(hand.bet);
+}
+
+function canSurrender(hand) {
+  return hand.status === "playing" && hand.cards.length === 2 && !hand.fromSplit;
+}
+
+function canSplit(hand) {
+  return hand.status === "playing" && hand.cards.length === 2 && pairRankFor(hand.cards) && hasChipsFor(hand.bet);
+}
+
+function pairRankFor(cards) {
+  if (cards.length !== 2) return null;
+  const first = strategyRank(cards[0].rank);
+  const second = strategyRank(cards[1].rank);
+  return first === second ? first : null;
+}
+
+function drawCard() {
+  const sim = ensureSimStats();
+  if (!Array.isArray(sim.shoe) || !sim.shoe.length) {
+    sim.shoe = shuffledShoe();
+    sim.reshuffles += 1;
+    sim.shoeId = randomId();
+  }
+
+  const card = sim.shoe.pop();
+  saveStats();
+  return card;
+}
+
+function dealerUpcardRank() {
+  return strategyRank(state.sim.dealer[0]?.rank ?? "10");
+}
+
+function bestTotal(cards) {
+  let value = 0;
+  let aces = 0;
+  cards.forEach((card) => {
+    if (card.hidden) return;
+    if (card.rank === "A") {
+      value += 11;
+      aces += 1;
+      return;
+    }
+    value += cardPointValue(card.rank);
+  });
+
+  let soft = aces > 0;
+  while (value > 21 && aces > 0) {
+    value -= 10;
+    aces -= 1;
+  }
+  soft = aces > 0;
+  return { value, soft };
+}
+
+function handLabel(cards) {
+  const total = bestTotal(cards);
+  if (isBlackjack(cards)) return "Blackjack";
+  if (total.value > 21) return `Bust ${total.value}`;
+  return `${total.soft ? "Soft" : "Hard"} ${total.value}`;
+}
+
+function isBlackjack(cards) {
+  return cards.length === 2 && bestTotal(cards).value === 21;
+}
+
+function dealerShouldHit(cards) {
+  const total = bestTotal(cards);
+  return total.value < 17 || (total.value === 17 && total.soft);
+}
+
+function strategyRank(rank) {
+  return ["10", "J", "Q", "K"].includes(rank) ? "10" : rank;
+}
+
+function seatSummary(seat) {
+  if (seat.hands.some((hand) => hand.status === "playing")) return "Playing";
+  return seat.hands.map((hand) => hand.result || handLabel(hand.cards)).join(" / ");
+}
+
+function formatMoney(value) {
+  const sign = value < 0 ? "-" : "";
+  const absolute = Math.abs(value);
+  const hasCents = Math.abs(absolute - Math.round(absolute)) > 0.001;
+  return `${sign}$${absolute.toLocaleString(undefined, {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: hasCents ? 2 : 0,
+  })}`;
+}
+
+function resetBankroll() {
+  const sim = ensureSimStats();
+  sim.bankroll = 1000;
+  sim.rounds = 0;
+  sim.net = 0;
+  sim.wins = 0;
+  sim.losses = 0;
+  sim.pushes = 0;
+  resetSimTable();
+  saveStats();
+  renderBankroll();
+  if (state.gymMode === "sim") renderSimRound("Chip stack reset.");
 }
 
 function renderLessons() {
@@ -602,6 +1284,14 @@ function loadSelectedSpot() {
 }
 
 function createCard(card) {
+  if (card.hidden) {
+    const node = document.createElement("div");
+    node.className = "playing-card is-hidden";
+    node.setAttribute("aria-label", "Hidden card");
+    node.innerHTML = '<span class="card-back-mark" aria-hidden="true">21</span>';
+    return node;
+  }
+
   const suit = card.suit ?? randomSuit();
   const node = document.createElement("div");
   node.className = `playing-card ${suit === "♥" || suit === "♦" ? "is-red" : ""}`;
@@ -1126,6 +1816,7 @@ function syncStats() {
   renderCategories();
   renderWeakSpots();
   renderMasteryGrid();
+  renderBankroll();
 }
 
 function renderSessionStrip() {
@@ -1305,6 +1996,7 @@ function loadStats() {
     scenarios: {},
     lessons: {},
     flashcards: {},
+    sim: defaultSimStats(),
   };
 
   try {
@@ -1320,10 +2012,47 @@ function loadStats() {
       lessons: parsed.lessons ?? {},
       flashcards: parsed.flashcards ?? {},
       recent: parsed.recent ?? [],
+      sim: normalizeSimStats(parsed.sim),
     };
   } catch {
     return fallback;
   }
+}
+
+function defaultSimStats() {
+  return {
+    bankroll: 1000,
+    rounds: 0,
+    net: 0,
+    wins: 0,
+    losses: 0,
+    pushes: 0,
+    shoe: [],
+    shoeId: null,
+    reshuffles: 0,
+  };
+}
+
+function normalizeSimStats(sim = {}) {
+  const source = sim && typeof sim === "object" ? sim : {};
+  const fallback = defaultSimStats();
+  return {
+    ...fallback,
+    ...source,
+    bankroll: numberOr(source.bankroll, fallback.bankroll),
+    rounds: numberOr(source.rounds, fallback.rounds),
+    net: numberOr(source.net, fallback.net),
+    wins: numberOr(source.wins, fallback.wins),
+    losses: numberOr(source.losses, fallback.losses),
+    pushes: numberOr(source.pushes, fallback.pushes),
+    reshuffles: numberOr(source.reshuffles, fallback.reshuffles),
+    shoe: Array.isArray(source.shoe) ? source.shoe.filter((card) => card?.rank && card?.suit) : [],
+  };
+}
+
+function ensureSimStats() {
+  state.stats.sim = normalizeSimStats(state.stats.sim);
+  return state.stats.sim;
 }
 
 function saveStats() {
@@ -1335,10 +2064,13 @@ function resetStats() {
   if (!confirmed) return;
   localStorage.removeItem(STORAGE_KEY);
   state.stats = loadStats();
+  prepareShoeForRound();
+  resetSimTable();
   syncStats();
   startLearnLesson(state.learnLesson);
   renderFlashcard();
-  nextHand();
+  if (state.gymMode === "sim") renderSimRound("Stats reset. New shoe is ready.");
+  else nextHand();
 }
 
 function percent(numerator, denominator) {
@@ -1347,6 +2079,11 @@ function percent(numerator, denominator) {
 
 function upcardValue(rank) {
   if (rank === "A") return 11;
+  return cardPointValue(rank);
+}
+
+function cardPointValue(rank) {
+  if (["10", "J", "Q", "K"].includes(rank)) return 10;
   return Number(rank);
 }
 
@@ -1356,6 +2093,15 @@ function rankLabel(rank) {
 
 function randomSuit() {
   return SUITS[Math.floor(Math.random() * SUITS.length)];
+}
+
+function randomId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function numberOr(value, fallback) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
 }
 
 function suitName(suit) {
