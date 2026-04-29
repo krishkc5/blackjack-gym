@@ -19,6 +19,9 @@ const state = {
   focus: "all",
   current: null,
   locked: false,
+  learnLesson: "foundations",
+  learnCurrent: null,
+  learnLocked: false,
   stats: loadStats(),
 };
 
@@ -33,7 +36,27 @@ const els = {
   feedbackTitle: document.querySelector("#feedback-title"),
   feedbackCopy: document.querySelector("#feedback-copy"),
   nextButton: document.querySelector("#next-btn"),
+  lessonList: document.querySelector("#lesson-list"),
+  lessonKicker: document.querySelector("#lesson-kicker"),
+  lessonTitle: document.querySelector("#lesson-title"),
+  learnDealerCards: document.querySelector("#learn-dealer-cards"),
+  learnPlayerCards: document.querySelector("#learn-player-cards"),
+  learnHandTag: document.querySelector("#learn-hand-tag"),
+  learnActionButtons: document.querySelectorAll("[data-learn-action]"),
+  learnFeedbackZone: document.querySelector("#learn-feedback-zone"),
+  learnFeedbackTitle: document.querySelector("#learn-feedback-title"),
+  learnFeedbackCopy: document.querySelector("#learn-feedback-copy"),
+  learnNextButton: document.querySelector("#learn-next-btn"),
+  coachTitle: document.querySelector("#coach-title"),
+  coachCopy: document.querySelector("#coach-copy"),
+  coachRule: document.querySelector("#coach-rule"),
+  hintButton: document.querySelector("#hint-btn"),
+  hintCopy: document.querySelector("#hint-copy"),
   focusButtons: document.querySelectorAll("[data-focus]"),
+  spotCategory: document.querySelector("#spot-category"),
+  spotPlayer: document.querySelector("#spot-player"),
+  spotDealer: document.querySelector("#spot-dealer"),
+  spotLoad: document.querySelector("#spot-load"),
   statAccuracy: document.querySelector("#stat-accuracy"),
   statStreak: document.querySelector("#stat-streak"),
   statMastery: document.querySelector("#stat-mastery"),
@@ -49,19 +72,29 @@ const els = {
 };
 
 const SCENARIOS = buildScenarios();
+const LESSONS = buildLessons();
 
 init();
 
 function init() {
   renderStrategy();
+  renderLessons();
+  populateSpotControls();
   wireEvents();
   syncStats();
+  startLearnLesson(state.learnLesson);
   nextHand();
 }
 
 function wireEvents() {
   els.viewButtons.forEach((button) => {
     button.addEventListener("click", () => setView(button.dataset.viewButton));
+  });
+
+  els.lessonList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-lesson]");
+    if (!button) return;
+    startLearnLesson(button.dataset.lesson);
   });
 
   els.focusButtons.forEach((button) => {
@@ -76,7 +109,15 @@ function wireEvents() {
     button.addEventListener("click", () => submitAnswer(button.dataset.action));
   });
 
+  els.learnActionButtons.forEach((button) => {
+    button.addEventListener("click", () => submitLearnAnswer(button.dataset.learnAction));
+  });
+
   els.nextButton.addEventListener("click", nextHand);
+  els.learnNextButton.addEventListener("click", nextLearnSpot);
+  els.hintButton.addEventListener("click", toggleHint);
+  els.spotCategory.addEventListener("change", populateSpotPlayers);
+  els.spotLoad.addEventListener("click", loadSelectedSpot);
   els.resetStats.addEventListener("click", resetStats);
 
   document.addEventListener("keydown", (event) => {
@@ -95,11 +136,18 @@ function wireEvents() {
     if (!action) return;
 
     event.preventDefault();
+    const activeView = document.querySelector(".view.is-active")?.dataset.view;
     if (action === "NEXT") {
-      if (state.locked) nextHand();
+      if (activeView === "learn" && state.learnLocked) nextLearnSpot();
+      if (activeView === "gym" && state.locked) nextHand();
       return;
     }
-    submitAnswer(action);
+
+    if (activeView === "learn") {
+      submitLearnAnswer(action);
+      return;
+    }
+    if (activeView === "gym") submitAnswer(action);
   });
 }
 
@@ -113,11 +161,15 @@ function setView(viewName) {
 
 function nextHand() {
   const pool = getScenarioPool(state.focus);
-  state.current = pickScenario(pool);
+  setGymScenario(pickScenario(pool));
+}
+
+function setGymScenario(scenario, intro = "Choose an action.") {
+  state.current = scenario;
   state.locked = false;
 
   els.feedbackZone.classList.remove("is-correct", "is-wrong");
-  els.feedbackTitle.textContent = "Choose an action.";
+  els.feedbackTitle.textContent = intro;
   els.feedbackCopy.textContent = "";
   els.nextButton.disabled = true;
   els.actionButtons.forEach((button) => {
@@ -158,6 +210,295 @@ function renderHand(scenario) {
   els.handTag.textContent = scenario.label;
   els.dealerCards.replaceChildren(createCard(scenario.dealer));
   els.playerCards.replaceChildren(...scenario.player.map(createCard));
+}
+
+function renderLessons() {
+  const buttons = LESSONS.map((lesson) => {
+    const item = state.stats.lessons[lesson.id] ?? { total: 0, correct: 0 };
+    const pool = getLessonPool(lesson);
+    const accuracy = percent(item.correct, item.total);
+    const button = document.createElement("button");
+    button.className = "lesson-card";
+    button.type = "button";
+    button.dataset.lesson = lesson.id;
+    button.classList.toggle("is-active", lesson.id === state.learnLesson);
+    button.innerHTML = `
+      <span class="lesson-card-title">${lesson.title}</span>
+      <span class="lesson-card-copy">${lesson.description}</span>
+      <span class="lesson-card-meta">${item.total} reps · ${accuracy}% · ${pool.length} spots</span>
+    `;
+    return button;
+  });
+
+  els.lessonList.replaceChildren(...buttons);
+}
+
+function startLearnLesson(lessonId) {
+  state.learnLesson = lessonId;
+  renderLessons();
+  nextLearnSpot();
+}
+
+function nextLearnSpot() {
+  const lesson = currentLesson();
+  const pool = getLessonPool(lesson);
+  const progress = state.stats.lessons[lesson.id] ?? { total: 0 };
+  const scenario = pool[progress.total % pool.length];
+  setLearnScenario(scenario, lesson);
+}
+
+function setLearnScenario(scenario, lesson) {
+  const coach = coachForScenario(scenario, lesson);
+  state.learnCurrent = scenario;
+  state.learnLocked = false;
+
+  els.lessonKicker.textContent = lesson.kicker;
+  els.lessonTitle.textContent = lesson.title;
+  els.learnHandTag.textContent = scenario.label;
+  els.learnDealerCards.replaceChildren(createCard(scenario.dealer));
+  els.learnPlayerCards.replaceChildren(...scenario.player.map(createCard));
+  els.coachTitle.textContent = coach.title;
+  els.coachCopy.textContent = coach.copy;
+  els.coachRule.textContent = coach.rule;
+  els.hintCopy.textContent = coach.hint;
+  els.hintCopy.hidden = true;
+  els.hintButton.textContent = "Show hint";
+
+  els.learnFeedbackZone.classList.remove("is-correct", "is-wrong");
+  els.learnFeedbackTitle.textContent = "Choose an action.";
+  els.learnFeedbackCopy.textContent = "";
+  els.learnNextButton.disabled = true;
+  els.learnActionButtons.forEach((button) => {
+    button.disabled = false;
+    button.classList.remove("is-correct-choice", "is-wrong-choice");
+  });
+}
+
+function submitLearnAnswer(action) {
+  if (state.learnLocked || !state.learnCurrent) return;
+
+  const lesson = currentLesson();
+  const scenario = state.learnCurrent;
+  const correct = action === scenario.answer;
+  const correctAction = ACTIONS[scenario.answer];
+  const chosenAction = ACTIONS[action];
+  const coach = coachForScenario(scenario, lesson);
+
+  recordLessonAttempt(lesson.id, correct);
+  state.learnLocked = true;
+
+  els.learnFeedbackZone.classList.add(correct ? "is-correct" : "is-wrong");
+  els.learnFeedbackTitle.textContent = correct
+    ? `Correct: ${correctAction.label}.`
+    : `${correctAction.label}, not ${chosenAction.label}.`;
+  els.learnFeedbackCopy.textContent = `${scenario.reason} ${coach.after}`;
+  els.learnNextButton.disabled = false;
+
+  els.learnActionButtons.forEach((button) => {
+    button.disabled = true;
+    const buttonAction = button.dataset.learnAction;
+    button.classList.toggle("is-correct-choice", buttonAction === scenario.answer);
+    button.classList.toggle("is-wrong-choice", buttonAction === action && !correct);
+  });
+
+  renderLessons();
+}
+
+function recordLessonAttempt(lessonId, correct) {
+  state.stats.lessons ??= {};
+  state.stats.lessons[lessonId] ??= { total: 0, correct: 0 };
+  const item = state.stats.lessons[lessonId];
+  item.total += 1;
+  item.correct += correct ? 1 : 0;
+  item.last = Date.now();
+  saveStats();
+}
+
+function toggleHint() {
+  const hidden = !els.hintCopy.hidden;
+  els.hintCopy.hidden = hidden;
+  els.hintButton.textContent = hidden ? "Show hint" : "Hide hint";
+}
+
+function currentLesson() {
+  return LESSONS.find((lesson) => lesson.id === state.learnLesson) ?? LESSONS[0];
+}
+
+function getLessonPool(lesson) {
+  if (lesson.ids) {
+    return lesson.ids.map((id) => SCENARIOS.find((scenario) => scenario.id === id)).filter(Boolean);
+  }
+  return SCENARIOS.filter(lesson.selector);
+}
+
+function coachForScenario(scenario, lesson) {
+  const dealer = upcardValue(scenario.dealerRank);
+  const dealerText = dealer >= 7 || dealer === 11 ? "strong" : dealer >= 4 && dealer <= 6 ? "vulnerable" : "mixed";
+  const action = ACTIONS[scenario.answer].label.toLowerCase();
+  const base = {
+    title: `${scenario.label} vs dealer ${scenario.dealerRank}`,
+    copy: `${lesson.principle} This dealer upcard is ${dealerText}, so the decision is about whether to protect a made hand, attack with a double, or improve a weak hand.`,
+    rule: scenario.reason,
+    hint: `You are looking for ${action}.`,
+    after: "Keep the pattern, not the exact cards, in your head.",
+  };
+
+  if (scenario.category === "hard") return hardCoach(scenario, base);
+  if (scenario.category === "soft") return softCoach(scenario, base);
+  return pairCoach(scenario, base);
+}
+
+function hardCoach(scenario, base) {
+  const total = Number(scenario.label.replace("Hard ", ""));
+  if (scenario.answer === "R") {
+    return {
+      ...base,
+      copy: `Hard ${total} is a stiff hand against one of the dealer's best upcards. Late surrender matters before hit or stand.`,
+      rule: "Use surrender only on hard 16 vs 9, 10, A and hard 15 vs 10.",
+      hint: "Ask: is this one of the few late-surrender spots?",
+      after: "Surrender is not giving up; it is saving half a bet in the worst matchups.",
+    };
+  }
+  if (scenario.answer === "D") {
+    return {
+      ...base,
+      copy: `Hard ${total} has a strong one-card upside. Doubling is about pressing when your next card can make a powerful total.`,
+      rule: "Double 11 against everything, 10 against 2-9, and 9 against 3-6.",
+      hint: "If one good card makes 18-21 and the dealer is not too strong, look for double.",
+      after: "The double spots are small in number, so they become fast once grouped.",
+    };
+  }
+  if (scenario.answer === "S") {
+    return {
+      ...base,
+      copy: `Hard ${total} is already made or the dealer is vulnerable enough that standing is better than drawing.`,
+      rule: "Stand on 17+, stand 13-16 vs 2-6, and stand 12 vs 4-6.",
+      hint: "Dealer 2-6 is where stiff hands often stop drawing.",
+      after: "Most hard-total stand decisions come from letting weak dealer cards break.",
+    };
+  }
+  return {
+    ...base,
+    copy: `Hard ${total} is not strong enough to keep as-is against this upcard.`,
+    rule: "Hit hard 8 or less, hit 12 vs 2-3 and 7-A, and hit 13-16 vs 7-A unless surrender applies.",
+    hint: "If standing waits for the dealer to fail and the dealer is not vulnerable, improve your hand.",
+    after: "Hard-total hits are usually the spots where your total is weak and the dealer is not under pressure.",
+  };
+}
+
+function softCoach(scenario, base) {
+  const side = Number(scenario.label.split(",")[1]);
+  const total = side + 11;
+  if (scenario.answer === "D") {
+    return {
+      ...base,
+      copy: `Soft ${total} cannot bust on one card, so the ace lets you attack dealer weakness.`,
+      rule: "Double soft 13-14 vs 5-6, soft 15-16 vs 4-6, soft 17-18 vs 2-6, and soft 19 vs 6.",
+      hint: "Soft double decisions cluster around dealer 4-6, with stronger soft totals widening a bit.",
+      after: "Soft hands are flexible; use that flexibility to double when the dealer is exposed.",
+    };
+  }
+  if (scenario.answer === "S") {
+    return {
+      ...base,
+      copy: `Soft ${total} is strong enough to keep. The ace gives protection, but the total is already doing its job.`,
+      rule: "Stand on soft 19+, and stand soft 18 vs 7-8.",
+      hint: "Soft 18 is the pivot: stand against 7-8, hit against 9-A, double against 2-6.",
+      after: "Soft standing spots are about respecting that 18 or 19 is already a real hand.",
+    };
+  }
+  return {
+    ...base,
+    copy: `Soft ${total} needs more value and is not in a profitable double spot.`,
+    rule: "Hit soft totals when the dealer is too strong for a double and the hand is not strong enough to stand.",
+    hint: "If the dealer is 7-A and the soft hand is below 19, check whether it needs a hit.",
+    after: "The ace protects the draw, so hitting these soft totals is less scary than it looks.",
+  };
+}
+
+function pairCoach(scenario, base) {
+  const rank = scenario.player[0].rank;
+  if (scenario.answer === "P") {
+    return {
+      ...base,
+      copy: `A pair is a chance to turn one awkward hand into two better starting hands.`,
+      rule: "Always split aces and 8s. Split 2s, 3s, 6s, and 7s against weak/mid dealer cards; split 9s except vs 7, 10, A.",
+      hint: "First memorize the always-split hands: aces and 8s.",
+      after: "Pair strategy starts with the rank, then narrows by dealer upcard.",
+    };
+  }
+  if (scenario.answer === "D") {
+    return {
+      ...base,
+      copy: "A pair of 5s is really hard 10, and hard 10 is a double spot against most dealer cards.",
+      rule: "Never split 5s; play them as hard 10.",
+      hint: "Two 5s make 10, not two weak hands.",
+      after: "This is why pair recognition matters before you reach for the split button.",
+    };
+  }
+  if (scenario.answer === "S") {
+    return {
+      ...base,
+      copy: `This pair is already valuable enough to keep together against dealer ${scenario.dealerRank}.`,
+      rule: "Never split 10s, and keep 9s together against 7, 10, and A.",
+      hint: rank === "10" ? "Twenty is already the prize." : "Some 9,9 spots are stands, not splits.",
+      after: "Do not turn a strong made hand into extra variance without an edge.",
+    };
+  }
+  return {
+    ...base,
+    copy: `Splitting this pair does not create enough value against dealer ${scenario.dealerRank}.`,
+    rule: "When a small pair is not a split, play it as the matching hard total.",
+    hint: "Small pairs stop splitting as the dealer upcard gets stronger.",
+    after: "When the split disappears, go back to the hard-total logic.",
+  };
+}
+
+function populateSpotControls() {
+  const dealerOptions = DEALER_UPCARDS.map((rank) => optionNode(rank, rank));
+  els.spotDealer.replaceChildren(...dealerOptions);
+  els.spotDealer.value = "10";
+  populateSpotPlayers();
+}
+
+function populateSpotPlayers() {
+  const category = els.spotCategory.value;
+  const hands = spotHandsFor(category);
+  els.spotPlayer.replaceChildren(...hands.map((hand) => optionNode(hand.value, hand.label)));
+  els.spotPlayer.value = category === "hard" ? "Hard 16" : hands[0].value;
+}
+
+function spotHandsFor(category) {
+  if (category === "soft") {
+    return [9, 8, 7, 6, 5, 4, 3, 2].map((side) => ({ value: `A,${side}`, label: `A,${side}` }));
+  }
+  if (category === "pair") {
+    return ["A", "10", "9", "8", "7", "6", "5", "4", "3", "2"].map((rank) => ({
+      value: `${rank === "10" ? "T" : rank},${rank === "10" ? "T" : rank}`,
+      label: `${rank},${rank}`,
+    }));
+  }
+  return Array.from({ length: 15 }, (_, index) => {
+    const total = index + 5;
+    return { value: `Hard ${total}`, label: `Hard ${total}` };
+  });
+}
+
+function optionNode(value, label) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  return option;
+}
+
+function loadSelectedSpot() {
+  const scenario = SCENARIOS.find((item) => (
+    item.category === els.spotCategory.value
+    && item.label === els.spotPlayer.value
+    && item.dealerRank === els.spotDealer.value
+  ));
+  if (!scenario) return;
+  setGymScenario(scenario, "Spot loaded.");
 }
 
 function createCard(card) {
@@ -227,6 +568,62 @@ function buildScenarios() {
   }
 
   return scenarios;
+}
+
+function buildLessons() {
+  return [
+    {
+      id: "foundations",
+      title: "Foundation path",
+      kicker: "Start here",
+      description: "A compact route through the patterns that show up constantly.",
+      principle: "Classify the hand first: pair, soft total, or hard total.",
+      ids: [
+        "hard:Hard 17:vs:10",
+        "hard:Hard 16:vs:10",
+        "hard:Hard 12:vs:4",
+        "hard:Hard 11:vs:A",
+        "hard:Hard 9:vs:2",
+        "soft:A,7:vs:9",
+        "soft:A,8:vs:6",
+        "pair:8,8:vs:10",
+        "pair:T,T:vs:6",
+        "hard:Hard 15:vs:10",
+      ],
+    },
+    {
+      id: "hard",
+      title: "Hard totals",
+      kicker: "Core map",
+      description: "Stiff hands, made totals, and the 9-11 double zone.",
+      principle: "Hard hands have no ace cushion, so dealer strength matters quickly.",
+      selector: (scenario) => scenario.category === "hard",
+    },
+    {
+      id: "soft",
+      title: "Soft totals",
+      kicker: "Ace work",
+      description: "Use the ace cushion to separate hit, stand, and double spots.",
+      principle: "Soft hands can draw safely, which creates extra double opportunities.",
+      selector: (scenario) => scenario.category === "soft",
+    },
+    {
+      id: "pairs",
+      title: "Pairs",
+      kicker: "Split logic",
+      description: "Learn when one hand should become two hands.",
+      principle: "Pairs are decided by rank first, then by the dealer upcard.",
+      selector: (scenario) => scenario.category === "pair",
+    },
+    {
+      id: "pressure",
+      title: "Doubles and surrender",
+      kicker: "High leverage",
+      description: "The spots where one decision changes the most expected value.",
+      principle: "High-leverage plays are rare enough to memorize as families.",
+      selector: (scenario) => scenario.answer === "D" || scenario.answer === "R",
+    },
+  ];
 }
 
 function makeScenario({ category, label, player, dealerRank, answer, reason }) {
@@ -577,11 +974,22 @@ function loadStats() {
     days: {},
     categories: {},
     scenarios: {},
+    lessons: {},
   };
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...fallback, ...JSON.parse(raw) } : fallback;
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return {
+      ...fallback,
+      ...parsed,
+      days: parsed.days ?? {},
+      categories: parsed.categories ?? {},
+      scenarios: parsed.scenarios ?? {},
+      lessons: parsed.lessons ?? {},
+      recent: parsed.recent ?? [],
+    };
   } catch {
     return fallback;
   }
@@ -597,6 +1005,7 @@ function resetStats() {
   localStorage.removeItem(STORAGE_KEY);
   state.stats = loadStats();
   syncStats();
+  startLearnLesson(state.learnLesson);
   nextHand();
 }
 

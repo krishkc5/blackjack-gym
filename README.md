@@ -1,6 +1,6 @@
 # Blackjack Gym
 
-A static GitHub Pages trainer for blackjack basic strategy reps. The trainer tracks accuracy, streaks, category progress, scenario mastery, and weak spots in browser `localStorage`.
+A static GitHub Pages trainer for blackjack basic strategy reps. The app has a guided Learn mode for reasoning through patterns, a Gym mode for drills and exact spot simulation, and progress tracking in browser `localStorage`.
 
 Rules encoded in the trainer:
 

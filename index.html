@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f3efe7">
     <meta
       name="description"
-      content="A practice-based blackjack basic strategy trainer with progress tracking."
+      content="A guided blackjack basic strategy trainer with a practice gym and progress tracking."
     >
     <title>Blackjack Gym</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -20,7 +20,7 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#practice" aria-label="Blackjack Gym home">
+        <a class="brand" href="#learn" aria-label="Blackjack Gym home">
           <span class="brand-mark" aria-hidden="true">21</span>
           <span>
             <span class="brand-name">Blackjack Gym</span>
@@ -29,7 +29,8 @@
         </a>
 
         <nav class="tabs" aria-label="Views">
-          <button class="tab is-active" type="button" data-view-button="practice">Practice</button>
+          <button class="tab is-active" type="button" data-view-button="learn">Learn</button>
+          <button class="tab" type="button" data-view-button="gym">Gym</button>
           <button class="tab" type="button" data-view-button="progress">Progress</button>
           <button class="tab" type="button" data-view-button="strategy">Strategy</button>
         </nav>
@@ -40,13 +41,82 @@
       </header>
 
       <main>
-        <section class="view is-active" id="practice" data-view="practice" aria-labelledby="practice-title">
-          <div class="practice-grid">
-            <section class="trainer-panel" aria-labelledby="practice-title">
+        <section class="view is-active" id="learn" data-view="learn" aria-labelledby="learn-title">
+          <div class="learn-layout">
+            <aside class="lesson-rail" aria-labelledby="learn-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Coach</p>
+                  <h1 id="learn-title">Learn</h1>
+                </div>
+              </div>
+              <p class="rail-copy">
+                Work through one pattern at a time. Hints and explanations are separate from Gym stats.
+              </p>
+              <div class="lesson-list" id="lesson-list" aria-label="Lessons"></div>
+            </aside>
+
+            <section class="trainer-panel learn-panel" aria-labelledby="lesson-title">
               <div class="table-head">
                 <div>
-                  <p class="eyebrow">Current hand</p>
-                  <h1 id="practice-title">Make the call</h1>
+                  <p class="eyebrow" id="lesson-kicker">Guided practice</p>
+                  <h1 id="lesson-title">Foundation path</h1>
+                </div>
+                <div class="hand-tag" id="learn-hand-tag">Hard total</div>
+              </div>
+
+              <div class="coach-grid">
+                <div class="felt-surface learn-felt" aria-live="polite">
+                  <div class="dealer-row">
+                    <span class="area-label">Dealer</span>
+                    <div class="card-stack" id="learn-dealer-cards"></div>
+                  </div>
+
+                  <div class="versus-mark" aria-hidden="true">vs</div>
+
+                  <div class="player-row">
+                    <span class="area-label">Player</span>
+                    <div class="card-stack" id="learn-player-cards"></div>
+                  </div>
+                </div>
+
+                <aside class="coach-card" aria-label="Reasoning coach">
+                  <p class="eyebrow">Reasoning</p>
+                  <h2 id="coach-title">Read the spot</h2>
+                  <p class="coach-copy" id="coach-copy"></p>
+                  <div class="coach-rule" id="coach-rule"></div>
+                  <button class="hint-btn" type="button" id="hint-btn">Show hint</button>
+                  <p class="hint-copy" id="hint-copy" hidden></p>
+                </aside>
+              </div>
+
+              <div class="action-bar" role="group" aria-label="Guided strategy actions">
+                <button class="action-btn action-hit" type="button" data-learn-action="H">Hit</button>
+                <button class="action-btn action-stand" type="button" data-learn-action="S">Stand</button>
+                <button class="action-btn action-double" type="button" data-learn-action="D">Double</button>
+                <button class="action-btn action-split" type="button" data-learn-action="P">Split</button>
+                <button class="action-btn action-surrender" type="button" data-learn-action="R">Surrender</button>
+              </div>
+
+              <div class="feedback-zone" id="learn-feedback-zone" aria-live="polite">
+                <div>
+                  <p class="feedback-kicker">Guided rep</p>
+                  <p class="feedback-title" id="learn-feedback-title">Choose an action.</p>
+                </div>
+                <p class="feedback-copy" id="learn-feedback-copy"></p>
+                <button class="next-btn" type="button" id="learn-next-btn">Next lesson spot</button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="gym" data-view="gym" aria-labelledby="gym-title">
+          <div class="practice-grid">
+            <section class="trainer-panel" aria-labelledby="gym-title">
+              <div class="table-head">
+                <div>
+                  <p class="eyebrow">Gym floor</p>
+                  <h1 id="gym-title">Make the call</h1>
                 </div>
                 <div class="hand-tag" id="hand-tag">Hard total</div>
               </div>
@@ -83,13 +153,13 @@
               </div>
             </section>
 
-            <aside class="control-panel" aria-label="Practice controls and session stats">
+            <aside class="control-panel" aria-label="Gym controls and session stats">
               <section class="focus-panel" aria-labelledby="focus-title">
                 <div class="panel-heading">
                   <p class="eyebrow">Mode</p>
                   <h2 id="focus-title">Focus</h2>
                 </div>
-                <div class="focus-grid" role="group" aria-label="Practice focus">
+                <div class="focus-grid" role="group" aria-label="Gym focus">
                   <button class="focus-btn is-active" type="button" data-focus="all">All</button>
                   <button class="focus-btn" type="button" data-focus="hard">Hard</button>
                   <button class="focus-btn" type="button" data-focus="soft">Soft</button>
@@ -97,6 +167,32 @@
                   <button class="focus-btn" type="button" data-focus="double">Doubles</button>
                   <button class="focus-btn" type="button" data-focus="surrender">Surrender</button>
                   <button class="focus-btn focus-wide" type="button" data-focus="weak">Weak spots</button>
+                </div>
+              </section>
+
+              <section class="spot-panel" aria-labelledby="spot-title">
+                <div class="panel-heading">
+                  <p class="eyebrow">Simulate</p>
+                  <h2 id="spot-title">Spot picker</h2>
+                </div>
+                <div class="spot-form">
+                  <label>
+                    <span>Hand type</span>
+                    <select id="spot-category">
+                      <option value="hard">Hard total</option>
+                      <option value="soft">Soft total</option>
+                      <option value="pair">Pair</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Player hand</span>
+                    <select id="spot-player"></select>
+                  </label>
+                  <label>
+                    <span>Dealer upcard</span>
+                    <select id="spot-dealer"></select>
+                  </label>
+                  <button class="spot-load" type="button" id="spot-load">Load spot</button>
                 </div>
               </section>
 

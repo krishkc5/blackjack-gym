@@ -45,6 +45,17 @@ button {
   cursor: pointer;
 }
 
+select {
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: #fffdf8;
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .app-shell {
   width: min(1480px, calc(100% - 32px));
   margin: 0 auto;
@@ -162,7 +173,15 @@ button {
   align-items: start;
 }
 
+.learn-layout {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
 .trainer-panel,
+.lesson-rail,
 .control-panel,
 .progress-panel,
 .strategy-block {
@@ -174,6 +193,132 @@ button {
 
 .trainer-panel {
   overflow: hidden;
+}
+
+.lesson-rail {
+  padding: 20px;
+}
+
+.lesson-rail h1 {
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+}
+
+.rail-copy {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.lesson-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.lesson-card {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: #f7eddd;
+  color: var(--ink);
+  text-align: left;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.lesson-card.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.lesson-card-title,
+.lesson-card-copy,
+.lesson-card-meta {
+  display: block;
+}
+
+.lesson-card-title {
+  font-weight: 900;
+}
+
+.lesson-card-copy {
+  color: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.35;
+  opacity: 0.78;
+}
+
+.lesson-card-meta {
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  opacity: 0.7;
+}
+
+.coach-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 18px;
+  padding: 0 18px 18px;
+}
+
+.learn-felt {
+  min-height: 420px;
+  margin: 0;
+}
+
+.coach-card {
+  display: flex;
+  min-height: 420px;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+  background: #efe4d4;
+}
+
+.coach-card h2 {
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.coach-copy,
+.hint-copy {
+  margin: 0;
+  color: #464037;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.coach-rule {
+  margin-top: auto;
+  padding: 14px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: #fffaf0;
+  font-weight: 800;
+  line-height: 1.42;
+}
+
+.hint-btn,
+.spot-load {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: #d6c7ad;
+  color: var(--ink);
+  font-weight: 900;
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+.hint-copy {
+  padding-top: 2px;
 }
 
 .table-head,
@@ -366,6 +511,9 @@ h2 {
 
 .action-btn:hover,
 .focus-btn:hover,
+.lesson-card:hover,
+.hint-btn:hover,
+.spot-load:hover,
 .next-btn:hover,
 .reset-btn:hover {
   transform: translateY(-1px);
@@ -373,6 +521,9 @@ h2 {
 
 .action-btn:active,
 .focus-btn:active,
+.lesson-card:active,
+.hint-btn:active,
+.spot-load:active,
 .next-btn:active,
 .reset-btn:active {
   transform: translate(2px, 2px);
@@ -476,12 +627,14 @@ h2 {
 }
 
 .focus-panel,
+.spot-panel,
 .stat-panel,
 .daily-panel {
   padding: 18px;
 }
 
 .focus-panel,
+.spot-panel,
 .stat-panel {
   border-bottom: 2px solid var(--ink);
 }
@@ -507,6 +660,29 @@ h2 {
 
 .focus-wide {
   grid-column: 1 / -1;
+}
+
+.spot-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.spot-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.spot-form label span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.spot-load {
+  background: #e7dccb;
 }
 
 .stat-grid {
@@ -792,15 +968,24 @@ h2 {
 }
 
 @media (max-width: 1120px) {
+  .learn-layout,
   .practice-grid {
     grid-template-columns: 1fr;
   }
 
   .control-panel {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .focus-panel,
+  .focus-panel {
+    border-right: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .spot-panel {
+    border-bottom: 2px solid var(--ink);
+  }
+
   .stat-panel {
     border-right: 2px solid var(--ink);
     border-bottom: 0;
@@ -825,7 +1010,7 @@ h2 {
 
   .tabs {
     grid-auto-flow: row;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .tab {
@@ -847,6 +1032,15 @@ h2 {
     min-height: 380px;
     margin: 0 10px;
     padding: 32px 14px;
+  }
+
+  .coach-grid {
+    grid-template-columns: 1fr;
+    padding: 0 10px 10px;
+  }
+
+  .coach-card {
+    min-height: auto;
   }
 
   .playing-card {
@@ -871,6 +1065,7 @@ h2 {
   }
 
   .focus-panel,
+  .spot-panel,
   .stat-panel {
     border-right: 0;
     border-bottom: 2px solid var(--ink);
@@ -893,6 +1088,10 @@ h2 {
 
   .table-head {
     padding: 20px 16px 14px;
+  }
+
+  .tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .card-stack {
