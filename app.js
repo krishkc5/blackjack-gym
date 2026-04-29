@@ -22,6 +22,9 @@ const state = {
   learnLesson: "foundations",
   learnCurrent: null,
   learnLocked: false,
+  flashcardDeck: "all",
+  flashcardIndex: 0,
+  flashcardFlipped: false,
   stats: loadStats(),
 };
 
@@ -52,6 +55,18 @@ const els = {
   coachRule: document.querySelector("#coach-rule"),
   hintButton: document.querySelector("#hint-btn"),
   hintCopy: document.querySelector("#hint-copy"),
+  flashcardDeckButtons: document.querySelectorAll("[data-flashcard-deck]"),
+  flashcardCard: document.querySelector("#flashcard-card"),
+  flashcardType: document.querySelector("#flashcard-type"),
+  flashcardFront: document.querySelector("#flashcard-front"),
+  flashcardLabel: document.querySelector("#flashcard-label"),
+  flashcardBack: document.querySelector("#flashcard-back"),
+  flashcardCount: document.querySelector("#flashcard-count"),
+  flashcardFlip: document.querySelector("#flashcard-flip"),
+  flashcardKnown: document.querySelector("#flashcard-known"),
+  flashcardMissed: document.querySelector("#flashcard-missed"),
+  flashcardNext: document.querySelector("#flashcard-next"),
+  flashcardProgress: document.querySelector("#flashcard-progress"),
   focusButtons: document.querySelectorAll("[data-focus]"),
   spotCategory: document.querySelector("#spot-category"),
   spotPlayer: document.querySelector("#spot-player"),
@@ -73,12 +88,14 @@ const els = {
 
 const SCENARIOS = buildScenarios();
 const LESSONS = buildLessons();
+const FLASHCARDS = buildFlashcards();
 
 init();
 
 function init() {
   renderStrategy();
   renderLessons();
+  renderFlashcard();
   populateSpotControls();
   wireEvents();
   syncStats();
@@ -95,6 +112,10 @@ function wireEvents() {
     const button = event.target.closest("[data-lesson]");
     if (!button) return;
     startLearnLesson(button.dataset.lesson);
+  });
+
+  els.flashcardDeckButtons.forEach((button) => {
+    button.addEventListener("click", () => setFlashcardDeck(button.dataset.flashcardDeck));
   });
 
   els.focusButtons.forEach((button) => {
@@ -116,6 +137,17 @@ function wireEvents() {
   els.nextButton.addEventListener("click", nextHand);
   els.learnNextButton.addEventListener("click", nextLearnSpot);
   els.hintButton.addEventListener("click", toggleHint);
+  els.flashcardCard.addEventListener("click", flipFlashcard);
+  els.flashcardCard.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    event.stopPropagation();
+    flipFlashcard();
+  });
+  els.flashcardFlip.addEventListener("click", flipFlashcard);
+  els.flashcardKnown.addEventListener("click", () => markFlashcard("known"));
+  els.flashcardMissed.addEventListener("click", () => markFlashcard("missed"));
+  els.flashcardNext.addEventListener("click", nextFlashcard);
   els.spotCategory.addEventListener("change", populateSpotPlayers);
   els.spotLoad.addEventListener("click", loadSelectedSpot);
   els.resetStats.addEventListener("click", resetStats);
@@ -231,6 +263,74 @@ function renderLessons() {
   });
 
   els.lessonList.replaceChildren(...buttons);
+}
+
+function renderFlashcard() {
+  const deck = currentFlashcardDeck();
+  if (!deck.length) return;
+
+  if (state.flashcardIndex >= deck.length) state.flashcardIndex = 0;
+  const card = deck[state.flashcardIndex];
+  const reviewed = deck.filter((item) => state.stats.flashcards[item.id]?.seen).length;
+  const known = deck.reduce((sum, item) => sum + (state.stats.flashcards[item.id]?.known ?? 0), 0);
+  const missed = deck.reduce((sum, item) => sum + (state.stats.flashcards[item.id]?.missed ?? 0), 0);
+
+  els.flashcardDeckButtons.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.flashcardDeck === state.flashcardDeck);
+  });
+
+  els.flashcardType.textContent = card.type;
+  els.flashcardFront.textContent = card.front;
+  els.flashcardBack.textContent = card.back;
+  els.flashcardLabel.hidden = !state.flashcardFlipped;
+  els.flashcardBack.hidden = !state.flashcardFlipped;
+  els.flashcardCard.classList.toggle("is-flipped", state.flashcardFlipped);
+  els.flashcardCount.textContent = `${state.flashcardIndex + 1} / ${deck.length}`;
+  els.flashcardKnown.disabled = !state.flashcardFlipped;
+  els.flashcardMissed.disabled = !state.flashcardFlipped;
+  els.flashcardProgress.textContent = `${reviewed} reviewed · ${known} known · ${missed} missed`;
+}
+
+function setFlashcardDeck(deck) {
+  state.flashcardDeck = deck;
+  state.flashcardIndex = 0;
+  state.flashcardFlipped = false;
+  renderFlashcard();
+}
+
+function currentFlashcardDeck() {
+  if (state.flashcardDeck === "all") return FLASHCARDS;
+  return FLASHCARDS.filter((card) => card.deck === state.flashcardDeck);
+}
+
+function flipFlashcard() {
+  state.flashcardFlipped = !state.flashcardFlipped;
+  renderFlashcard();
+}
+
+function nextFlashcard() {
+  const deck = currentFlashcardDeck();
+  state.flashcardIndex = (state.flashcardIndex + 1) % deck.length;
+  state.flashcardFlipped = false;
+  renderFlashcard();
+}
+
+function markFlashcard(result) {
+  if (!state.flashcardFlipped) return;
+
+  const card = currentFlashcardDeck()[state.flashcardIndex];
+  state.stats.flashcards ??= {};
+  state.stats.flashcards[card.id] ??= { seen: 0, known: 0, missed: 0 };
+
+  const item = state.stats.flashcards[card.id];
+  item.seen ??= 0;
+  item.known ??= 0;
+  item.missed ??= 0;
+  item.seen += 1;
+  item[result] += 1;
+  item.last = Date.now();
+  saveStats();
+  nextFlashcard();
 }
 
 function startLearnLesson(lessonId) {
@@ -626,6 +726,235 @@ function buildLessons() {
   ];
 }
 
+function buildFlashcards() {
+  return [
+    {
+      id: "surrender-16",
+      deck: "surrender",
+      type: "Surrender",
+      front: "Hard 16 surrender rule",
+      back: "Surrender against dealer 9, 10, or A. Otherwise do not surrender; revert to hard totals.",
+    },
+    {
+      id: "surrender-15",
+      deck: "surrender",
+      type: "Surrender",
+      front: "Hard 15 surrender rule",
+      back: "Surrender against dealer 10. Otherwise do not surrender; revert to hard totals.",
+    },
+    {
+      id: "split-aa",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of aces",
+      back: "Always split aces.",
+    },
+    {
+      id: "split-tt",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of tens",
+      back: "Never split tens.",
+    },
+    {
+      id: "split-99",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 9s",
+      back: "Split against dealer 2 through 9, except for 7. Otherwise stand.",
+    },
+    {
+      id: "split-88",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 8s",
+      back: "Always split 8s.",
+    },
+    {
+      id: "split-77",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 7s",
+      back: "Split against dealer 2 through 7. Otherwise hit.",
+    },
+    {
+      id: "split-66",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 6s",
+      back: "Split against dealer 2 through 6. Otherwise hit.",
+    },
+    {
+      id: "split-55",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 5s",
+      back: "Double against dealer 2 through 9. Otherwise hit.",
+    },
+    {
+      id: "split-44",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 4s",
+      back: "Split against dealer 5 and 6. Otherwise hit.",
+    },
+    {
+      id: "split-33",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 3s",
+      back: "Split against dealer 2 through 7. Otherwise hit.",
+    },
+    {
+      id: "split-22",
+      deck: "splits",
+      type: "Splits",
+      front: "Pair of 2s",
+      back: "Split against dealer 2 through 7. Otherwise hit.",
+    },
+    {
+      id: "soft-definition",
+      deck: "soft",
+      type: "Soft totals",
+      front: "What is a soft total?",
+      back: "Any hand that has an ace as one of the first two cards, with the ace counted as 11 to start.",
+    },
+    {
+      id: "soft-20",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 20 (A,9)",
+      back: "Always stand.",
+    },
+    {
+      id: "soft-19",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 19 (A,8)",
+      back: "Double against dealer 6. Otherwise stand.",
+    },
+    {
+      id: "soft-18",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 18 (A,7)",
+      back: "Double against dealer 2 through 6, hit against dealer 9 through A, otherwise stand.",
+    },
+    {
+      id: "soft-17",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 17 (A,6)",
+      back: "Double against dealer 3 through 6. Otherwise hit.",
+    },
+    {
+      id: "soft-16",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 16 (A,5)",
+      back: "Double against dealer 4 through 6. Otherwise hit.",
+    },
+    {
+      id: "soft-15",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 15 (A,4)",
+      back: "Double against dealer 4 through 6. Otherwise hit.",
+    },
+    {
+      id: "soft-14",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 14 (A,3)",
+      back: "Double against dealer 5 and 6. Otherwise hit.",
+    },
+    {
+      id: "soft-13",
+      deck: "soft",
+      type: "Soft totals",
+      front: "Soft 13 (A,2)",
+      back: "Double against dealer 5 and 6. Otherwise hit.",
+    },
+    {
+      id: "hard-definition",
+      deck: "hard",
+      type: "Hard totals",
+      front: "What is a hard total?",
+      back: "Any hand that does not start with an ace, or has an ace that can only be counted as 1 instead of 11.",
+    },
+    {
+      id: "hard-17-plus",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 17 and up",
+      back: "Always stand.",
+    },
+    {
+      id: "hard-16",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 16",
+      back: "After checking surrender, stand against dealer 2 through 6. Otherwise hit.",
+    },
+    {
+      id: "hard-15",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 15",
+      back: "After checking surrender, stand against dealer 2 through 6. Otherwise hit.",
+    },
+    {
+      id: "hard-14",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 14",
+      back: "Stand against dealer 2 through 6. Otherwise hit.",
+    },
+    {
+      id: "hard-13",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 13",
+      back: "Stand against dealer 2 through 6. Otherwise hit.",
+    },
+    {
+      id: "hard-12",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 12",
+      back: "Stand against dealer 4 through 6. Otherwise hit.",
+    },
+    {
+      id: "hard-11",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 11",
+      back: "Always double.",
+    },
+    {
+      id: "hard-10",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 10",
+      back: "Double against dealer 2 through 9. Otherwise hit.",
+    },
+    {
+      id: "hard-9",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 9",
+      back: "Double against dealer 3 through 6. Otherwise hit.",
+    },
+    {
+      id: "hard-8",
+      deck: "hard",
+      type: "Hard totals",
+      front: "Hard 8",
+      back: "Always hit.",
+    },
+  ];
+}
+
 function makeScenario({ category, label, player, dealerRank, answer, reason }) {
   const dealer = { rank: dealerRank, suit: "♣" };
   return {
@@ -975,6 +1304,7 @@ function loadStats() {
     categories: {},
     scenarios: {},
     lessons: {},
+    flashcards: {},
   };
 
   try {
@@ -988,6 +1318,7 @@ function loadStats() {
       categories: parsed.categories ?? {},
       scenarios: parsed.scenarios ?? {},
       lessons: parsed.lessons ?? {},
+      flashcards: parsed.flashcards ?? {},
       recent: parsed.recent ?? [],
     };
   } catch {
@@ -1006,6 +1337,7 @@ function resetStats() {
   state.stats = loadStats();
   syncStats();
   startLearnLesson(state.learnLesson);
+  renderFlashcard();
   nextHand();
 }
 

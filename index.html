@@ -107,6 +107,42 @@
                 <button class="next-btn" type="button" id="learn-next-btn">Next lesson spot</button>
               </div>
             </section>
+
+            <section class="flashcard-panel" aria-labelledby="flashcard-title">
+              <div class="flashcard-head">
+                <div>
+                  <p class="eyebrow">Memorize</p>
+                  <h2 id="flashcard-title">Flashcards</h2>
+                </div>
+                <span class="mini-badge" id="flashcard-count">0 / 0</span>
+              </div>
+
+              <div class="deck-tabs" aria-label="Flashcard decks">
+                <button class="deck-btn is-active" type="button" data-flashcard-deck="all">All</button>
+                <button class="deck-btn" type="button" data-flashcard-deck="surrender">Surrender</button>
+                <button class="deck-btn" type="button" data-flashcard-deck="splits">Splits</button>
+                <button class="deck-btn" type="button" data-flashcard-deck="soft">Soft</button>
+                <button class="deck-btn" type="button" data-flashcard-deck="hard">Hard</button>
+              </div>
+
+              <div class="flashcard-stage">
+                <article class="flashcard" id="flashcard-card" tabindex="0" role="button" aria-label="Flip flashcard">
+                  <p class="flashcard-type" id="flashcard-type">Hard totals</p>
+                  <h3 id="flashcard-front">17 and up</h3>
+                  <p class="flashcard-label" id="flashcard-label" hidden>Answer</p>
+                  <p class="flashcard-back" id="flashcard-back" hidden>Always stand.</p>
+                </article>
+
+                <div class="flashcard-actions">
+                  <button class="flashcard-btn" type="button" id="flashcard-flip">Flip</button>
+                  <button class="flashcard-btn" type="button" id="flashcard-known">Know it</button>
+                  <button class="flashcard-btn" type="button" id="flashcard-missed">Missed</button>
+                  <button class="flashcard-btn" type="button" id="flashcard-next">Next</button>
+                </div>
+
+                <p class="flashcard-progress" id="flashcard-progress">0 known · 0 missed</p>
+              </div>
+            </section>
           </div>
         </section>
 
