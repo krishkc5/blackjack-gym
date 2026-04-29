@@ -378,6 +378,7 @@ h2 {
 .felt-surface {
   position: relative;
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
   min-height: 430px;
   margin: 0 18px;
   padding: 42px 24px;
@@ -403,33 +404,35 @@ h2 {
   position: relative;
   z-index: 1;
   display: grid;
+  width: 100%;
+  grid-template-columns: minmax(72px, 0.22fr) minmax(0, 1fr) minmax(72px, 0.22fr);
+  gap: 16px;
+  align-items: center;
   justify-items: center;
-  gap: 14px;
 }
 
 .dealer-row {
-  align-self: start;
-}
-
-.player-row {
   align-self: end;
 }
 
+.player-row {
+  align-self: start;
+}
+
 .area-label {
-  width: fit-content;
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.32);
-  border-radius: 999px;
-  color: #fff8e9;
-  background: rgba(0, 0, 0, 0.18);
+  justify-self: start;
+  padding: 4px 0 4px 10px;
+  border-left: 2px solid rgba(255, 248, 233, 0.38);
+  color: rgba(255, 248, 233, 0.78);
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
 .card-stack {
   display: flex;
+  grid-column: 2;
   align-items: center;
   justify-content: center;
   gap: 12px;
@@ -477,21 +480,26 @@ h2 {
 }
 
 .versus-mark {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 0;
-  display: grid;
-  width: 68px;
-  height: 68px;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 50%;
-  color: #fff8e9;
-  background: rgba(0, 0, 0, 0.16);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  width: min(280px, 42%);
+  align-items: center;
+  justify-self: center;
+  gap: 10px;
+  color: rgba(255, 248, 233, 0.7);
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.68rem;
   font-weight: 700;
-  transform: translate(-50%, -50%);
+  text-transform: uppercase;
+}
+
+.versus-mark::before,
+.versus-mark::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: rgba(255, 248, 233, 0.24);
 }
 
 .action-bar {
@@ -1113,8 +1121,7 @@ h2 {
   }
 
   .versus-mark {
-    width: 54px;
-    height: 54px;
+    width: min(180px, 54%);
   }
 
   .focus-grid,
